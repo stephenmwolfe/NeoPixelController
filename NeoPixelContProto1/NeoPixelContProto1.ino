@@ -1,4 +1,8 @@
+
+
 #include <Adafruit_NeoPixel.h>
+#include <LinkedList.h>
+
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
@@ -24,20 +28,35 @@ uint8_t strip2Speed = 1000;
 uint8_t strip3Speed = 1000;
 uint8_t strip4Speed = 1000;
 
+const uint8_t DEFAULT_BRIGHTNESS = 30;
+
+struct NeoPixelState {
+  public: uint32_t color;
+  public: uint8_t brightness;
+
+  public: NeoPixelState (uint32_t inColor, uint8_t inBrightness) {
+    color = inColor;
+    brightness = inBrightness;
+  }
+
+  public: NeoPixelState () {
+    color = 0;
+    brightness = 0;
+  }
+  
+};
+
 struct NeoPixelWiper {
-
-  public: static const uint8_t MAX_COLORS = 10;
-
-  private: Adafruit_NeoPixel * strip;
-  private: uint16_t cycleSize;
-  private: uint16_t stepOn = 0;
-  private: uint16_t ledOn = 0;
-  private: uint8_t colorOn = 0;
+  
+  protected: Adafruit_NeoPixel * strip;
+  protected: uint16_t cycleSize;
+  protected: uint16_t stepOn = 0;
+  protected: uint16_t ledOn = 0;
+  protected: uint8_t colorOn = 0;
   //private: uint8_t brightness = 0;
-  private: uint16_t cyclePoint = 0;
-  private: uint16_t runSpeed;
-  private: uint8_t numColors = 0;
-  private: uint32_t colors[MAX_COLORS];
+  protected: uint16_t cyclePoint = 0;
+  protected: uint16_t runSpeed;
+  protected: LinkedList<NeoPixelState> colors = LinkedList<NeoPixelState>();
 
   //Base getters/setters
 
@@ -76,15 +95,25 @@ struct NeoPixelWiper {
   }
 
   public: addColor(uint32_t  inColor) {
-    colors[numColors++] = inColor;
+    uint8_t brightness = strip->getBrightness();
+    //NeoPixelState newState = new NeoPixelState(inColor,brightness);
+    colors.add(NeoPixelState(inColor,brightness));
   }
 
-  public: uint32_t getColor(uint8_t num) {
-    return colors[num];
+  public: addColor(uint32_t  inColor, uint8_t inBrightness) {
+    colors.add(NeoPixelState(inColor,inBrightness));
+  }
+
+  public: addColor(NeoPixelState  inColor) {
+    colors.add(inColor);
+  }
+
+  public: NeoPixelState getColor(int num) {
+    return colors.get(num);
   }
 
   public: clearColor() {
-    numColors = 0;
+    colors.clear();
   }
 
   //constructers
@@ -112,15 +141,20 @@ struct NeoPixelWiper {
       cycleColor();
       ledOn = 0;
     }
-    strip->setPixelColor(ledOn, colors[colorOn]);
-    strip->show();
+    setPixel(ledOn, colors.get(colorOn));
   }
 
   public: cycleColor() {
     colorOn++;
-    if(colorOn >= numColors) {
+    if(colorOn >= colors.size()) {
       colorOn = 0;
     }
+  }
+
+  public: setPixel(int pixelNumber, NeoPixelState state) {
+    strip->setBrightness(state.brightness);
+    strip->setPixelColor(ledOn, state.color);
+    strip->show();
   }
   
   
@@ -143,7 +177,7 @@ void setup() {
 
 
   stripPt1->begin();
-  stripPt1->setBrightness(30);
+  stripPt1->setBrightness(DEFAULT_BRIGHTNESS);
   stripPt1->show(); // Initialize all pixels to 'off'
 
   wiper1 = new NeoPixelWiper(stripPt1,30,1000);
