@@ -23,12 +23,16 @@ Adafruit_NeoPixel *stripPt1 = &strip1;
 Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(2, 5, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel *stripPt2 = &strip2;
 
+Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(4, 5, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel *stripPt3 = &strip3;
+
 uint8_t strip1Speed = 100;
 uint8_t strip2Speed = 1000;
 uint8_t strip3Speed = 1000;
 uint8_t strip4Speed = 1000;
 
 const uint8_t DEFAULT_BRIGHTNESS = 30;
+const uint8_t CYCLE_DELAY = 30;
 
 struct NeoPixelState {
   public: uint32_t color;
@@ -46,14 +50,13 @@ struct NeoPixelState {
   
 };
 
-struct NeoPixelWiper {
+class NeoPixelController {
   
   protected: Adafruit_NeoPixel * strip;
   protected: uint16_t cycleSize;
   protected: uint16_t stepOn = 0;
   protected: uint16_t ledOn = 0;
   protected: uint8_t colorOn = 0;
-  //private: uint8_t brightness = 0;
   protected: uint16_t cyclePoint = 0;
   protected: uint16_t runSpeed;
   protected: LinkedList<NeoPixelState> colors = LinkedList<NeoPixelState>();
@@ -79,12 +82,6 @@ struct NeoPixelWiper {
   public: setBrightness(uint8_t inBrightness) {
     strip->setBrightness(inBrightness);
   }
-
-  /*
-  public: uint8_t getBrightness() {
-    return brightness;
-  }
-  */
   
   public: setRunSpeed(uint16_t inRunSpeed) {
     runSpeed = inRunSpeed;
@@ -118,7 +115,7 @@ struct NeoPixelWiper {
 
   //constructers
 
-  public: NeoPixelWiper (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) {
+  public: NeoPixelController (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) {
     setStrip(inStrip);
     setCycleSize(inCycleSize);
     setRunSpeed(inRunSpeed);
@@ -126,7 +123,7 @@ struct NeoPixelWiper {
 
   //logic
 
-  public: cycle() {
+  public: virtual cycle() {
     cyclePoint += cycleSize;
 
     if(cyclePoint >= runSpeed){ //
@@ -135,33 +132,104 @@ struct NeoPixelWiper {
     }
   }
 
-  public: cycleStep() {
-    ledOn++;
-    if(ledOn >= strip->numPixels()) {
-      cycleColor();
-      ledOn = 0;
+  public: virtual cycleStep() {
+    for(int i = 0; i < strip->numPixels(); i++) {
+      setPixel(i, colors.get(colorOn));
     }
-    setPixel(ledOn, colors.get(colorOn));
+    cycleColor();
   }
 
-  public: cycleColor() {
+  public: virtual cycleColor() {
     colorOn++;
     if(colorOn >= colors.size()) {
       colorOn = 0;
     }
   }
 
-  public: setPixel(int pixelNumber, NeoPixelState state) {
+  public: virtual setPixel(int pixelNumber, NeoPixelState state) {
     strip->setBrightness(state.brightness);
-    strip->setPixelColor(ledOn, state.color);
+    strip->setPixelColor(pixelNumber, state.color);
     strip->show();
   }
   
   
 };
 
-NeoPixelWiper *wiper1;
-NeoPixelWiper *wiper2;
+class NeoPixelWiper: public NeoPixelController {
+
+  //constructers
+
+  public: NeoPixelWiper (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelController (inStrip, inCycleSize, inRunSpeed) {
+
+  }
+  
+  //logic
+
+  public: virtual cycleStep() {
+    if(ledOn >= strip->numPixels()) {
+      cycleColor();
+      ledOn = 0;
+    }
+    setPixel(ledOn, colors.get(colorOn));
+    ledOn++;
+  }
+  
+};
+
+class NeoPixelAlternator: public NeoPixelController {
+
+  //constructers
+
+  public: NeoPixelAlternator (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelController (inStrip, inCycleSize, inRunSpeed) {
+
+  }
+  
+  //logic
+
+  public: virtual cycleStep() {
+
+    colorOn = ledOn++;
+
+    for(int i = strip->numPixels() - 1; i >= 0 ; i--) {
+      setPixel(i, colors.get(colorOn));
+      cycleColor();
+    }
+
+    if(ledOn >= colors.size()) {
+      ledOn = 0;
+    }
+
+    /*
+    if(colors.size() <= strip->numPixels()) {
+      if(ledOn >= strip->numPixels()) {
+        ledOn = 0;
+      }
+      
+      int adr = ledOn;
+      
+      for(int i = 0; i < strip->numPixels(); i++) {
+        setPixel(adr, colors.get(colorOn));
+        cycleColor();
+        adr--;
+        if(adr < 0){
+          adr = strip->numPixels() - 1;
+        }
+      }
+      colorOn = 0;
+      ledOn++;
+    }
+    else {
+      
+    }
+    */
+
+  }
+  
+};
+
+NeoPixelController *control1;
+NeoPixelWiper *control2;
+NeoPixelAlternator *control3;
 
 // IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
@@ -175,35 +243,52 @@ void setup() {
   #endif
   // End of trinket special code
 
-
+  /*
   stripPt1->begin();
   stripPt1->setBrightness(DEFAULT_BRIGHTNESS);
   stripPt1->show(); // Initialize all pixels to 'off'
 
-  wiper1 = new NeoPixelWiper(stripPt1,30,1000);
+  control1 = new NeoPixelController(stripPt1,CYCLE_DELAY,1000);
 
-  wiper1->addColor(strip1.Color(255, 0, 0)); //Red
-  wiper1->addColor(strip1.Color(0, 255, 0)); //Green
-  wiper1->addColor(strip1.Color(0, 0, 255)); //Blue
-  wiper1->addColor(strip1.Color(255, 255, 255)); //White
+  control1->addColor(strip1.Color(255, 0, 0)); //Red
+  control1->addColor(strip1.Color(0, 255, 0)); //Green
+  control1->addColor(strip1.Color(0, 0, 255)); //Blue
+  control1->addColor(strip1.Color(255, 255, 255)); //White
 
   stripPt2->begin();
-  stripPt2->setBrightness(30);
+  stripPt2->setBrightness(DEFAULT_BRIGHTNESS);
   stripPt2->show(); // Initialize all pixels to 'off'
 
-  wiper2 = new NeoPixelWiper(stripPt2,30,100);
+  wiper2 = new NeoPixelWiper(stripPt2,CYCLE_DELAY,200);
 
-  wiper2->addColor(strip1.Color(255, 255, 0)); //Red
-  wiper2->addColor(strip1.Color(0, 255, 255)); //Green
-  wiper2->addColor(strip1.Color(255, 0, 255)); //Blue
+  wiper2->addColor(strip1.Color(255, 255, 0));
+  wiper2->addColor(strip1.Color(0, 255, 255));
+  wiper2->addColor(strip1.Color(255, 0, 255));
+  */
+  
+  stripPt3->begin();
+  stripPt3->setBrightness(DEFAULT_BRIGHTNESS);
+  stripPt3->show(); // Initialize all pixels to 'off'
+
+  control3 = new NeoPixelAlternator(stripPt3,CYCLE_DELAY,100);
+
+  //control3->addColor(strip1.Color(255, 0, 0)); //Red
+  //control3->addColor(strip1.Color(0, 255, 0)); //Green
+  //control3->addColor(strip1.Color(0, 0, 255)); //Blue
+  control3->addColor(strip1.Color(0, 0, 0)); //Black
+  control3->addColor(strip1.Color(255, 255, 255),255); //White
+  //control3->addColor(strip1.Color(255, 255, 0));
+  //control3->addColor(strip1.Color(0, 255, 255));
+  //control3->addColor(strip1.Color(255, 0, 255));
 }
 
 void loop() {
 
-  wiper1->cycle();
+  //control1->cycle();
   //wiper1->cycleStep();
-  wiper2->cycle();
-  delay(30);
+  //wiper2->cycle();
+  control3->cycle();
+  delay(CYCLE_DELAY);
   
   
   // Some example procedures showing how to display to the pixels:
