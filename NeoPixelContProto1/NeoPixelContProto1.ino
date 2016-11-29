@@ -1,5 +1,6 @@
 
-
+#include <Adafruit_GFX.h>
+#include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
 #include <LinkedList.h>
 
@@ -23,9 +24,16 @@ Adafruit_NeoPixel *stripPt1 = &strip1;
 Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(2, 5, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel *stripPt2 = &strip2;
 
-Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(4, 5, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(40, 6, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel *stripPt3 = &strip3;
 
+Adafruit_NeoMatrix matrix1 = Adafruit_NeoMatrix(8, 5, PIN,
+  NEO_MATRIX_TOP     + NEO_MATRIX_LEFT +
+  NEO_MATRIX_ROWS + NEO_MATRIX_PROGRESSIVE,
+  NEO_GRB            + NEO_KHZ800);
+
+Adafruit_NeoMatrix *matrixPt1 = &matrix1;
+  
 uint8_t strip1Speed = 100;
 uint8_t strip2Speed = 1000;
 uint8_t strip3Speed = 1000;
@@ -34,42 +42,24 @@ uint8_t strip4Speed = 1000;
 const uint8_t DEFAULT_BRIGHTNESS = 30;
 const uint8_t CYCLE_DELAY = 30;
 
-struct NeoPixelState {
-  public: uint32_t color;
-  public: uint8_t brightness;
-
-  public: NeoPixelState (uint32_t inColor, uint8_t inBrightness) {
-    color = inColor;
-    brightness = inBrightness;
-  }
-
-  public: NeoPixelState () {
-    color = 0;
-    brightness = 0;
-  }
-  
-};
+// Colors
+const uint32_t GOLD = matrix1.Color(162, 144, 96);
+const uint32_t MUSTARD = matrix1.Color(44, 189, 12);
+const uint32_t SKY_BLUE = matrix1.Color(0, 178, 239);
+const uint32_t DEEP_BLUE = matrix1.Color(0, 87, 184);
+const uint32_t DARK_CYAN = matrix1.Color(0, 140, 149);
+const uint32_t KERMIT = matrix1.Color(67, 176, 42);
+const uint32_t VIVID_ORANGE = matrix1.Color(227, 82, 5);
 
 class NeoPixelController {
   
-  protected: Adafruit_NeoPixel * strip;
   protected: uint16_t cycleSize;
   protected: uint16_t stepOn = 0;
   protected: uint16_t ledOn = 0;
   protected: uint8_t colorOn = 0;
   protected: uint16_t cyclePoint = 0;
   protected: uint16_t runSpeed;
-  protected: LinkedList<NeoPixelState> colors = LinkedList<NeoPixelState>();
-
-  //Base getters/setters
-
-  public: setStrip(Adafruit_NeoPixel * inStrip) {
-    strip = inStrip;
-  }
-
-  public: Adafruit_NeoPixel * getStrip() {
-    return strip;
-  }
+  protected: LinkedList<uint32_t> colors = LinkedList<uint32_t>();
 
   public: setCycleSize(uint16_t inCycleSize) {
     cycleSize = inCycleSize;
@@ -77,10 +67,6 @@ class NeoPixelController {
 
   public: uint16_t getCycleSize() {
     return cycleSize;
-  }
-
-  public: setBrightness(uint8_t inBrightness) {
-    strip->setBrightness(inBrightness);
   }
   
   public: setRunSpeed(uint16_t inRunSpeed) {
@@ -92,20 +78,10 @@ class NeoPixelController {
   }
 
   public: addColor(uint32_t  inColor) {
-    uint8_t brightness = strip->getBrightness();
-    //NeoPixelState newState = new NeoPixelState(inColor,brightness);
-    colors.add(NeoPixelState(inColor,brightness));
-  }
-
-  public: addColor(uint32_t  inColor, uint8_t inBrightness) {
-    colors.add(NeoPixelState(inColor,inBrightness));
-  }
-
-  public: addColor(NeoPixelState  inColor) {
     colors.add(inColor);
   }
 
-  public: NeoPixelState getColor(int num) {
+  public: uint32_t getColor(int num) {
     return colors.get(num);
   }
 
@@ -115,10 +91,14 @@ class NeoPixelController {
 
   //constructers
 
-  public: NeoPixelController (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) {
-    setStrip(inStrip);
+  public: NeoPixelController (uint16_t inCycleSize, uint16_t inRunSpeed) {
     setCycleSize(inCycleSize);
     setRunSpeed(inRunSpeed);
+  }
+
+  public: NeoPixelController () {
+    setCycleSize(100);
+    setRunSpeed(100);
   }
 
   //logic
@@ -132,13 +112,6 @@ class NeoPixelController {
     }
   }
 
-  public: virtual cycleStep() {
-    for(int i = 0; i < strip->numPixels(); i++) {
-      setPixel(i, colors.get(colorOn));
-    }
-    cycleColor();
-  }
-
   public: virtual cycleColor() {
     colorOn++;
     if(colorOn >= colors.size()) {
@@ -146,20 +119,186 @@ class NeoPixelController {
     }
   }
 
-  public: virtual setPixel(int pixelNumber, NeoPixelState state) {
-    strip->setBrightness(state.brightness);
-    strip->setPixelColor(pixelNumber, state.color);
-    strip->show();
+  public: virtual cycleStep() {
+
   }
   
+  public: virtual setPixel(int pixelNumber, uint32_t  inColor) {
+
+  }
+
+  public: virtual setBrightness(uint8_t inBrightness) {
+
+  }
   
 };
 
-class NeoPixelWiper: public NeoPixelController {
+class NeoPixelStripController: public NeoPixelController {
+
+  protected: Adafruit_NeoPixel * strip;
+
+    //Base getters/setters
+
+  public: setStrip(Adafruit_NeoPixel * inStrip) {
+    strip = inStrip;
+  }
+
+  public: Adafruit_NeoPixel * getStrip() {
+    return strip;
+  }
 
   //constructers
 
-  public: NeoPixelWiper (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelController (inStrip, inCycleSize, inRunSpeed) {
+  public: NeoPixelStripController (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelController (inCycleSize, inRunSpeed) {
+    setStrip(inStrip);
+  }
+  
+  //logic
+
+  public: virtual cycleStep() {
+    for(int i = 0; i < strip->numPixels(); i++) {
+      setPixel(i, colors.get(colorOn));
+    }
+    strip->show();
+    cycleColor();
+  }
+  
+  public: virtual setPixel(int pixelNumber, uint32_t  inColor) {
+    strip->setPixelColor(pixelNumber, inColor);
+  }
+
+  public: setBrightness(uint8_t inBrightness) {
+    strip->setBrightness(inBrightness);
+  }
+  
+};
+
+class NeoPixelMatrixController: public NeoPixelController {
+
+  //Supported GFX Implementations
+  public: static const uint8_t NEO_MATRIX = 0;
+
+  protected: Adafruit_GFX * matrix;
+  protected: uint8_t gfxImpl = NEO_MATRIX;
+
+  //Base getters/setters
+
+  public: setGfxImpl (uint8_t value) {
+    gfxImpl = value;
+  }
+
+  public: uint8_t getGfxImpl() {
+    return gfxImpl;
+  }
+
+  public: setMatrix (Adafruit_GFX * inMatrix) {
+    matrix = inMatrix;
+  }
+
+  public: Adafruit_GFX * getMatrix() {
+    return matrix;
+  }
+
+  //constructers
+
+  public: NeoPixelMatrixController (Adafruit_GFX * inMatrix, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelController (inCycleSize, inRunSpeed) {
+    setMatrix(inMatrix);
+  }
+  
+  //logic
+
+  public: virtual cycleStep() {
+    matrix->fillScreen(colors.get(colorOn));
+    show();
+    cycleColor();
+  }
+  
+  public: virtual setPixel(int pixelNumber, uint32_t  inColor) {
+//    matrix->setPixelColor(pixelNumber, inColor);
+  }
+
+  public: setBrightness(uint8_t inBrightness) {  
+    switch(gfxImpl) {
+      case NEO_MATRIX:
+        ((Adafruit_NeoMatrix*)matrix)->setBrightness(inBrightness);
+        break;
+      
+    }
+  }
+
+  public: virtual show() {
+
+    switch(gfxImpl) {
+      case NEO_MATRIX:
+        ((Adafruit_NeoMatrix*)matrix)->show();
+        break;
+      
+    }
+    
+  }
+  
+};
+
+class NeoPixelRectWiper: public NeoPixelMatrixController {
+
+  protected: float ratio = 1;
+  protected: uint8_t origX = 0;
+  protected: uint8_t origY = 0;
+
+  //Base getters/setters
+
+  public: setRatio (float value) {
+    ratio = value;
+  }
+
+  public: float getRatio() {
+    return ratio;
+  }
+
+  public: setOrigX (uint8_t value) {
+    origX = value;
+  }
+
+  public: uint8_t getOrigX() {
+    return origX;
+  }
+
+  public: setOrigY (uint8_t value) {
+    origY = value;
+  }
+
+  public: uint8_t getOrigY() {
+    return origY;
+  }
+
+  //constructers
+  
+  public: NeoPixelRectWiper (Adafruit_GFX * inMatrix, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelMatrixController (inMatrix, inCycleSize, inRunSpeed) {
+    setOrigX(inMatrix->width()/2);
+    setOrigY(inMatrix->height()/2);
+    setRatio(inMatrix->width()/inMatrix->height());
+    ledOn = 0;
+  }
+
+  //logic
+
+  public: virtual cycleStep() {
+    if(ledOn > matrix->width() && ledOn > matrix->height()) {
+      cycleColor();
+      ledOn = 0;
+    }
+    matrix->fillRect(origX - ledOn, (origY - ledOn)/ratio, ledOn*2 - matrix->width()%2, (ledOn*2)/ratio - matrix->height()%2, colors.get(colorOn));
+    show();
+    ledOn++;
+  }
+  
+};
+
+class NeoPixelWiper: public NeoPixelStripController {
+
+  //constructers
+
+  public: NeoPixelWiper (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelStripController (inStrip, inCycleSize, inRunSpeed) {
 
   }
   
@@ -171,16 +310,17 @@ class NeoPixelWiper: public NeoPixelController {
       ledOn = 0;
     }
     setPixel(ledOn, colors.get(colorOn));
+    strip->show();
     ledOn++;
   }
-  
+
 };
 
-class NeoPixelAlternator: public NeoPixelController {
+class NeoPixelAlternator: public NeoPixelStripController {
 
   //constructers
 
-  public: NeoPixelAlternator (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelController (inStrip, inCycleSize, inRunSpeed) {
+  public: NeoPixelAlternator (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelStripController (inStrip, inCycleSize, inRunSpeed) {
 
   }
   
@@ -199,37 +339,51 @@ class NeoPixelAlternator: public NeoPixelController {
       ledOn = 0;
     }
 
-    /*
-    if(colors.size() <= strip->numPixels()) {
-      if(ledOn >= strip->numPixels()) {
-        ledOn = 0;
-      }
-      
-      int adr = ledOn;
-      
-      for(int i = 0; i < strip->numPixels(); i++) {
-        setPixel(adr, colors.get(colorOn));
-        cycleColor();
-        adr--;
-        if(adr < 0){
-          adr = strip->numPixels() - 1;
-        }
-      }
-      colorOn = 0;
-      ledOn++;
-    }
-    else {
-      
-    }
-    */
+    strip->show();
 
   }
   
 };
 
-NeoPixelController *control1;
+class NeoPixelRandomizer: public NeoPixelStripController {
+
+  uint8_t pixelPerCycle = 1;
+
+  public: setPixelPerCycle(uint8_t value) {
+    pixelPerCycle = value;
+  }
+
+  public: uint8_t getPixelPerCycle() {
+    return runSpeed;
+  }
+
+  //constructers
+
+  public: NeoPixelRandomizer (Adafruit_NeoPixel * inStrip, uint16_t inCycleSize, uint16_t inRunSpeed) : NeoPixelStripController (inStrip, inCycleSize, inRunSpeed) {
+
+  }
+  
+  //logic
+
+  public: virtual cycleStep() {
+
+    ledOn = random(strip->numPixels());
+    colorOn = random(colors.size());
+
+    for(int i = 0; i < pixelPerCycle  ; i++) {
+      ledOn = random(strip->numPixels());
+      setPixel(ledOn, colors.get(colorOn));
+    }
+
+    strip->show();
+
+  }
+  
+};
+
+NeoPixelStripController *control1;
 NeoPixelWiper *control2;
-NeoPixelAlternator *control3;
+NeoPixelController *control3;
 
 // IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
@@ -270,16 +424,30 @@ void setup() {
   stripPt3->setBrightness(DEFAULT_BRIGHTNESS);
   stripPt3->show(); // Initialize all pixels to 'off'
 
-  control3 = new NeoPixelAlternator(stripPt3,CYCLE_DELAY,100);
+  matrix1.begin();
+  matrix1.setTextWrap(false);
+  matrix1.setBrightness(40);
 
-  //control3->addColor(strip1.Color(255, 0, 0)); //Red
-  //control3->addColor(strip1.Color(0, 255, 0)); //Green
-  //control3->addColor(strip1.Color(0, 0, 255)); //Blue
-  control3->addColor(strip1.Color(0, 0, 0)); //Black
-  control3->addColor(strip1.Color(255, 255, 255),255); //White
-  //control3->addColor(strip1.Color(255, 255, 0));
-  //control3->addColor(strip1.Color(0, 255, 255));
-  //control3->addColor(strip1.Color(255, 0, 255));
+  //control3 = new NeoPixelStripController(stripPt3,CYCLE_DELAY,100);
+  //control3 = new NeoPixelWiper(stripPt3,CYCLE_DELAY,100);
+  //control3 = new NeoPixelAlternator(stripPt3,CYCLE_DELAY,100);
+  //control3 = new NeoPixelRandomizer(stripPt3,CYCLE_DELAY,100);
+  //control3 = new NeoPixelMatrixController(matrixPt1,CYCLE_DELAY,1000);
+  control3 = new NeoPixelRectWiper(matrixPt1,CYCLE_DELAY,1000);
+  ((NeoPixelRectWiper*)control3)->setOrigX(4);
+  ((NeoPixelRectWiper*)control3)->setOrigY(3);
+
+  //control3->addColor(GOLD);
+  control3->addColor(MUSTARD);
+  control3->addColor(SKY_BLUE);
+  //control3->addColor(DEEP_BLUE);
+ // control3->addColor(DARK_CYAN);
+  control3->addColor(KERMIT);
+  control3->addColor(VIVID_ORANGE);
+  //control3->setPixelPerCycle(3);
+  //control3->addColor(matrix1.Color(255, 0, 0)); //RED
+  //control3->addColor(matrix1.Color(0, 255, 0)); //GREEN
+  //control3->addColor(matrix1.Color(0, 0, 255)); //BLUE
 }
 
 void loop() {
@@ -306,75 +474,10 @@ void loop() {
   //theaterChaseRainbow(50);
 }
 
-// Fill the dots one after the other with a color
-void colorWipe(Adafruit_NeoPixel *inStrip, uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<inStrip->numPixels(); i++) {
-    inStrip->setPixelColor(i, c);
-    inStrip->show();
-    delay(wait);
-  }
-}
 
-void rainbow(uint8_t wait) {
-  uint16_t i, j;
 
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip1.numPixels(); i++) {
-      strip1.setPixelColor(i, Wheel((i+j) & 255));
-    }
-    strip1.show();
-    delay(wait);
-  }
-}
 
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) {
-  uint16_t i, j;
 
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< strip1.numPixels(); i++) {
-      strip1.setPixelColor(i, Wheel(((i * 256 / strip1.numPixels()) + j) & 255));
-    }
-    strip1.show();
-    delay(wait);
-  }
-}
-
-//Theatre-style crawling lights.
-void theaterChase(uint32_t c, uint8_t wait) {
-  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
-    for (int q=0; q < 3; q++) {
-      for (uint16_t i=0; i < strip1.numPixels(); i=i+3) {
-        strip1.setPixelColor(i+q, c);    //turn every third pixel on
-      }
-      strip1.show();
-
-      delay(wait);
-
-      for (uint16_t i=0; i < strip1.numPixels(); i=i+3) {
-        strip1.setPixelColor(i+q, 0);        //turn every third pixel off
-      }
-    }
-  }
-}
-
-//Theatre-style crawling lights with rainbow effect
-void theaterChaseRainbow(uint8_t wait) {
-  for (int j=0; j < 256; j++) {     // cycle all 256 colors in the wheel
-    for (int q=0; q < 3; q++) {
-      for (uint16_t i=0; i < strip1.numPixels(); i=i+3) {
-        strip1.setPixelColor(i+q, Wheel( (i+j) % 255));    //turn every third pixel on
-      }
-      strip1.show();
-
-      delay(wait);
-
-      for (uint16_t i=0; i < strip1.numPixels(); i=i+3) {
-        strip1.setPixelColor(i+q, 0);        //turn every third pixel off
-      }
-    }
-  }
-}
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
